@@ -40,24 +40,22 @@ type ParticipantData = {
 
 type AnswerData = {
   id: string;
+  participant_id: string;
+  question_id: string;
   selected_option: "A" | "B" | "C" | "D";
   is_correct: boolean;
   score: number;
   answered_at: string;
-  participants:
-  | {
+  participants: {
     name: string;
     player_code: string;
     total_score: number;
-  }[]
-  | null;
-  questions:
-  | {
+  } | null;
+  questions: {
     question_text: string;
     correct_option: "A" | "B" | "C" | "D";
     order_number: number;
-  }[]
-  | null;
+  } | null;
 };
 
 type AdminTab = "events" | "control" | "questions" | "answers" | "winners";
@@ -211,38 +209,38 @@ export default function AdminPage() {
     setParticipants((data || []) as ParticipantData[]);
   }
 
-  async function loadAnswers(eventId: string) {
-    const { data, error } = await supabase
-      .from("answers")
-      .select(
-        `
-        id,
-        selected_option,
-        is_correct,
-        score,
-        answered_at,
-        participants (
-          name,
-          player_code,
-          total_score
-        ),
-        questions (
-          question_text,
-          correct_option,
-          order_number
-        )
-      `,
+ async function loadAnswers(eventId: string) {
+  const { data, error } = await supabase
+    .from("answers")
+    .select(`
+      id,
+      participant_id,
+      question_id,
+      selected_option,
+      is_correct,
+      score,
+      answered_at,
+      participants (
+        name,
+        player_code,
+        total_score
+      ),
+      questions (
+        question_text,
+        correct_option,
+        order_number
       )
-      .eq("event_id", eventId)
-      .order("answered_at", { ascending: false });
+    `)
+    .eq("event_id", eventId)
+    .order("answered_at", { ascending: false });
 
-    if (error) {
-      alert("صار خطأ أثناء تحميل الإجابات");
-      return;
-    }
-
-    setAnswers((data || []) as unknown as AnswerData[]);
+  if (error) {
+    alert("صار خطأ أثناء تحميل الإجابات");
+    return;
   }
+
+  setAnswers((data || []) as unknown as AnswerData[]);
+}
 
   async function refreshAll() {
     await loadEvents();
@@ -1284,6 +1282,7 @@ function AnswersSection({
     <section className="rounded-3xl border border-white/10 bg-white/10 p-6">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-xl font-black">إجابات المشاركين</h2>
+
         <span className="rounded-full bg-[#F2C94C] px-4 py-2 font-black text-[#063F36]">
           {answers.length} إجابة
         </span>
@@ -1296,15 +1295,17 @@ function AnswersSection({
       ) : (
         <div className="space-y-6">
           {participants.map((participant) => {
-            const playerAnswers = answers.filter(
-              (answer) =>
-                answer.participants?.[0]?.player_code ===
-                participant.player_code,
-            );
+         const playerAnswers = answers.filter(
+  (answer) => answer.participant_id === participant.id
+);
 
             const correctCount = playerAnswers.filter(
-              (answer) => answer.is_correct,
-            ).length;
+  (answer) => answer.is_correct
+).length;
+
+const wrongCount = playerAnswers.filter(
+  (answer) => !answer.is_correct
+).length;
 
             return (
               <div
@@ -1314,15 +1315,17 @@ function AnswersSection({
                 <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h3 className="text-xl font-black">{participant.name}</h3>
+
                     <p className="text-sm text-white/60">
                       الكود: {participant.player_code}
                     </p>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     <Badge title="النقاط" value={participant.total_score} />
-                    <Badge title="إجابات صحيحة" value={correctCount} />
-                    <Badge title="عدد الإجابات" value={playerAnswers.length} />
+                    <Badge title="صحيحة" value={correctCount} />
+                    <Badge title="خاطئة" value={wrongCount} />
+                    <Badge title="كل الإجابات" value={playerAnswers.length} />
                   </div>
                 </div>
 
@@ -1339,21 +1342,22 @@ function AnswersSection({
                       >
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <p className="font-black text-[#F2C94C]">
-                            السؤال {answer.questions?.[0]?.order_number}
+                            السؤال {answer.questions?.order_number || "-"}
                           </p>
 
                           <span
-                            className={`rounded-full px-3 py-1 text-sm font-black ${answer.is_correct
+                            className={`rounded-full px-3 py-1 text-sm font-black ${
+                              answer.is_correct
                                 ? "bg-green-500/20 text-green-200"
                                 : "bg-red-500/20 text-red-200"
-                              }`}
+                            }`}
                           >
                             {answer.is_correct ? "صحيح" : "خطأ"}
                           </span>
                         </div>
 
                         <p className="mb-3 text-white/90">
-                          {answer.questions?.[0]?.question_text}
+                          {answer.questions?.question_text || "السؤال غير موجود"}
                         </p>
 
                         <div className="grid gap-3 md:grid-cols-3">
@@ -1361,10 +1365,12 @@ function AnswersSection({
                             title="إجابة المشارك"
                             value={answer.selected_option}
                           />
+
                           <SmallInfo
                             title="الجواب الصحيح"
-                            value={answer.questions?.[0]?.correct_option || "-"}
+                            value={answer.questions?.correct_option || "-"}
                           />
+
                           <SmallInfo title="النقاط" value={answer.score} />
                         </div>
                       </div>
