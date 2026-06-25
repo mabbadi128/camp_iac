@@ -133,12 +133,7 @@ export default function Home() {
                 دخول المشاركين
               </a>
 
-              <a
-                href="/screen"
-                className="rounded-2xl border border-white/25 bg-[#032B25]/30 px-7 py-4 text-center font-bold text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl transition hover:bg-white/10"
-              >
-                شاشة العرض
-              </a>
+           
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">

@@ -15,6 +15,7 @@ type EventData = {
 
 type QuestionData = {
   id: string;
+  event_id: string;
   question_text: string;
   option_a: string;
   option_b: string;
@@ -32,6 +33,11 @@ export default function ScreenPage() {
   const [participantsCount, setParticipantsCount] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [controlLoading, setControlLoading] = useState(false);
+
+  function getEndTime(seconds: number) {
+    return new Date(Date.now() + seconds * 1000).toISOString();
+  }
 
   async function loadScreen(code: string) {
     const { data: eventData, error: eventError } = await supabase
@@ -102,6 +108,207 @@ export default function ScreenPage() {
     }
 
     setLoading(false);
+  }
+
+  async function startFirstQuestion() {
+    if (!event) return;
+
+    setControlLoading(true);
+
+    const { data: firstQuestion, error } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("event_id", event.id)
+      .order("order_number", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (error || !firstQuestion) {
+      alert("لا يوجد أسئلة داخل هذه الفعالية");
+      setControlLoading(false);
+      return;
+    }
+
+    const endsAt = getEndTime(firstQuestion.time_limit_seconds || 20);
+
+    const { error: updateError } = await supabase
+      .from("events")
+      .update({
+        status: "active",
+        current_question_id: firstQuestion.id,
+        current_question_ends_at: endsAt,
+        paused_remaining_seconds: null,
+      })
+      .eq("id", event.id);
+
+    if (updateError) {
+      alert("حدث خطأ أثناء بدء السؤال");
+    } else {
+      await loadScreen(event.code);
+    }
+
+    setControlLoading(false);
+  }
+
+  async function goNextQuestion() {
+    if (!event) return;
+
+    if (!event.current_question_id) {
+      await startFirstQuestion();
+      return;
+    }
+
+    setControlLoading(true);
+
+    let currentQuestion = question;
+
+    if (!currentQuestion) {
+      const { data } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("id", event.current_question_id)
+        .single();
+
+      currentQuestion = data as QuestionData;
+    }
+
+    if (!currentQuestion) {
+      alert("لم يتم العثور على السؤال الحالي");
+      setControlLoading(false);
+      return;
+    }
+
+    const { data: nextQuestion } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("event_id", event.id)
+      .gt("order_number", currentQuestion.order_number)
+      .order("order_number", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (!nextQuestion) {
+      await finishEvent();
+      setControlLoading(false);
+      return;
+    }
+
+    const endsAt = getEndTime(nextQuestion.time_limit_seconds || 20);
+
+    const { error: updateError } = await supabase
+      .from("events")
+      .update({
+        status: "active",
+        current_question_id: nextQuestion.id,
+        current_question_ends_at: endsAt,
+        paused_remaining_seconds: null,
+      })
+      .eq("id", event.id);
+
+    if (updateError) {
+      alert("حدث خطأ أثناء الانتقال للسؤال التالي");
+    } else {
+      await loadScreen(event.code);
+    }
+
+    setControlLoading(false);
+  }
+
+  async function finishEvent() {
+    if (!event) return;
+
+    setControlLoading(true);
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        status: "finished",
+        current_question_id: null,
+        current_question_ends_at: null,
+        paused_remaining_seconds: null,
+      })
+      .eq("id", event.id);
+
+    if (error) {
+      alert("حدث خطأ أثناء إنهاء الفعالية");
+    } else {
+      await loadScreen(event.code);
+    }
+
+    setControlLoading(false);
+  }
+
+  async function resetEventWaiting() {
+    if (!event) return;
+
+    setControlLoading(true);
+
+    let remainingSeconds = timeLeft;
+
+    if (event.current_question_ends_at) {
+      remainingSeconds = Math.max(
+        0,
+        Math.ceil(
+          (new Date(event.current_question_ends_at).getTime() -
+            new Date().getTime()) /
+            1000
+        )
+      );
+    }
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        status: "waiting",
+        current_question_ends_at: null,
+        paused_remaining_seconds: remainingSeconds,
+      })
+      .eq("id", event.id);
+
+    if (error) {
+      alert("حدث خطأ أثناء تفعيل وضع الانتظار");
+    } else {
+      await loadScreen(event.code);
+    }
+
+    setControlLoading(false);
+  }
+
+  async function resumeEvent() {
+    if (!event) return;
+
+    if (!event.current_question_id) {
+      await startFirstQuestion();
+      return;
+    }
+
+    setControlLoading(true);
+
+    const remainingSeconds =
+      event.paused_remaining_seconds && event.paused_remaining_seconds > 0
+        ? event.paused_remaining_seconds
+        : timeLeft > 0
+        ? timeLeft
+        : question?.time_limit_seconds || 20;
+
+    const endsAt = getEndTime(remainingSeconds);
+
+    const { error } = await supabase
+      .from("events")
+      .update({
+        status: "active",
+        current_question_ends_at: endsAt,
+        paused_remaining_seconds: null,
+      })
+      .eq("id", event.id);
+
+    if (error) {
+      alert("حدث خطأ أثناء إزالة وضع الانتظار");
+    } else {
+      await loadScreen(event.code);
+    }
+
+    setControlLoading(false);
   }
 
   useEffect(() => {
@@ -210,6 +417,51 @@ export default function ScreenPage() {
           </div>
         </header>
 
+        {/* أزرار التحكم */}
+        <div className="relative z-10 mt-5 rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+          <div className="grid gap-3 md:grid-cols-5">
+            <button
+              onClick={startFirstQuestion}
+              disabled={controlLoading}
+              className="rounded-2xl bg-[#F2C94C] px-4 py-4 font-black text-[#063F36] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              بدء أول سؤال
+            </button>
+
+            <button
+              onClick={goNextQuestion}
+              disabled={controlLoading}
+              className="rounded-2xl border border-white/20 px-4 py-4 font-black transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              السؤال التالي
+            </button>
+
+            <button
+              onClick={finishEvent}
+              disabled={controlLoading}
+              className="rounded-2xl border border-red-300/30 bg-red-500/20 px-4 py-4 font-black text-red-100 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              إنهاء الفعالية
+            </button>
+
+            <button
+              onClick={resetEventWaiting}
+              disabled={controlLoading}
+              className="rounded-2xl border border-white/20 px-4 py-4 font-black transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              وضع الانتظار
+            </button>
+
+            <button
+              onClick={resumeEvent}
+              disabled={controlLoading}
+              className="rounded-2xl border border-green-300/30 bg-green-500/20 px-4 py-4 font-black text-green-100 transition hover:bg-green-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              إزالة وضع الانتظار
+            </button>
+          </div>
+        </div>
+
         <div className="relative z-10 flex flex-1 items-center justify-center py-8">
           {!question ? (
             <div className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-white/10 p-6 text-center shadow-2xl backdrop-blur md:p-10">
@@ -220,7 +472,7 @@ export default function ScreenPage() {
               </h2>
 
               <p className="mt-5 text-lg text-white/70 md:text-2xl">
-                يتم الانتقال بين الأسئلة من لوحة التحكم
+                يتم الانتقال بين الأسئلة من شاشة التحكم
               </p>
             </div>
           ) : (
@@ -254,7 +506,7 @@ export default function ScreenPage() {
 
                 {event.status === "waiting" && (
                   <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-[#F2C94C]/40 bg-[#F2C94C]/10 px-4 py-3 text-base font-black text-[#F2C94C] md:px-6 md:py-4 md:text-xl">
-                    وضع الانتظار — لم يبدأ استقبال الإجابات بعد
+                    وضع الانتظار — تم إيقاف استقبال الإجابات مؤقتًا
                   </div>
                 )}
               </div>
