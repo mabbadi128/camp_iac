@@ -209,10 +209,10 @@ export default function AdminPage() {
     setParticipants((data || []) as ParticipantData[]);
   }
 
- async function loadAnswers(eventId: string) {
-  const { data, error } = await supabase
-    .from("answers")
-    .select(`
+  async function loadAnswers(eventId: string) {
+    const { data, error } = await supabase
+      .from("answers")
+      .select(`
       id,
       participant_id,
       question_id,
@@ -231,16 +231,16 @@ export default function AdminPage() {
         order_number
       )
     `)
-    .eq("event_id", eventId)
-    .order("answered_at", { ascending: false });
+      .eq("event_id", eventId)
+      .order("answered_at", { ascending: false });
 
-  if (error) {
-    alert("صار خطأ أثناء تحميل الإجابات");
-    return;
+    if (error) {
+      alert("صار خطأ أثناء تحميل الإجابات");
+      return;
+    }
+
+    setAnswers((data || []) as unknown as AnswerData[]);
   }
-
-  setAnswers((data || []) as unknown as AnswerData[]);
-}
 
   async function refreshAll() {
     await loadEvents();
@@ -706,7 +706,6 @@ export default function AdminPage() {
                   className="mx-auto"
                 />
               </div>
-
               <a
                 href={participantJoinUrl}
                 target="_blank"
@@ -720,6 +719,8 @@ export default function AdminPage() {
               </p>
             </div>
           )}
+                        <CampNotificationsBox />
+
           <a
             href="/api/admin-logout"
             className="mt-4 block w-full rounded-2xl border border-red-300/30 bg-red-500/20 px-4 py-3 text-center font-black text-red-100 hover:bg-red-500/30"
@@ -843,6 +844,107 @@ export default function AdminPage() {
     </main>
   );
 }
+function CampNotificationsBox() {
+  const [customMessage, setCustomMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [resultMessage, setResultMessage] = useState("");
+
+  async function sendNotification(message: string) {
+    if (!message.trim()) {
+      alert("اكتب نص الإشعار");
+      return;
+    }
+
+    setSending(true);
+    setResultMessage("");
+
+    const res = await fetch("/api/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "إشعار المعسكر",
+        body: message,
+        url: "/",
+      }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    setSending(false);
+
+    if (!res.ok) {
+      setResultMessage(data?.message || "فشل إرسال الإشعار");
+      return;
+    }
+
+    setResultMessage(`تم الإرسال: ${data.sent} / ${data.total}`);
+  }
+
+  return (
+    <div className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-4">
+      <p className="mb-3 text-center text-sm font-bold text-white/70">
+        إشعارات المعسكر
+      </p>
+
+      <div className="grid gap-2">
+        <button
+          onClick={() => sendNotification("حان وقت الغداء 🍽️")}
+          disabled={sending}
+          className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-black hover:bg-white/10 disabled:opacity-60"
+        >
+          🍽️ حان وقت الغداء
+        </button>
+
+        <button
+          onClick={() => sendNotification("حان وقت النوم 🌙")}
+          disabled={sending}
+          className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-black hover:bg-white/10 disabled:opacity-60"
+        >
+          🌙 حان وقت النوم
+        </button>
+
+        <button
+          onClick={() => sendNotification("يرجى التوجه إلى ساحة النشاط ⛺")}
+          disabled={sending}
+          className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-black hover:bg-white/10 disabled:opacity-60"
+        >
+          ⛺ التوجه إلى ساحة النشاط
+        </button>
+
+        <button
+          onClick={() => sendNotification("يبدأ النشاط التالي بعد 10 دقائق 🔔")}
+          disabled={sending}
+          className="rounded-2xl border border-white/20 px-4 py-3 text-sm font-black hover:bg-white/10 disabled:opacity-60"
+        >
+          🔔 النشاط التالي بعد 10 دقائق
+        </button>
+
+        <textarea
+          value={customMessage}
+          onChange={(e) => setCustomMessage(e.target.value)}
+          placeholder="اكتب إشعار مخصص..."
+          className="mt-2 min-h-24 rounded-2xl bg-white px-4 py-3 text-right text-[#063F36] outline-none"
+        />
+
+        <button
+          onClick={() => sendNotification(customMessage)}
+          disabled={sending}
+          className="rounded-2xl bg-[#F2C94C] px-4 py-3 font-black text-[#063F36] disabled:opacity-60"
+        >
+          {sending ? "جار الإرسال..." : "إرسال إشعار مخصص"}
+        </button>
+
+        {resultMessage && (
+          <p className="rounded-2xl bg-white/10 p-3 text-center text-sm font-bold text-white/80">
+            {resultMessage}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function SideButton({
   active,
@@ -859,8 +961,8 @@ function SideButton({
     <button
       onClick={onClick}
       className={`flex w-full items-center justify-between rounded-2xl px-4 py-4 text-right font-black transition ${active
-          ? "bg-[#F2C94C] text-[#063F36]"
-          : "bg-white/10 text-white hover:bg-white/15"
+        ? "bg-[#F2C94C] text-[#063F36]"
+        : "bg-white/10 text-white hover:bg-white/15"
         }`}
     >
       <span>{title}</span>
@@ -916,8 +1018,8 @@ function EventsSection({
             <div
               key={item.id}
               className={`rounded-3xl border p-5 ${selectedEventId === item.id
-                  ? "border-[#F2C94C] bg-[#F2C94C]/15"
-                  : "border-white/10 bg-white/10"
+                ? "border-[#F2C94C] bg-[#F2C94C]/15"
+                : "border-white/10 bg-white/10"
                 }`}
             >
               <div className="mb-4 flex items-start justify-between gap-3">
@@ -1073,8 +1175,8 @@ function ControlSection({
                 key={question.id}
                 onClick={() => setActiveQuestion(question)}
                 className={`w-full rounded-2xl border p-4 text-right font-black ${currentQuestion?.id === question.id
-                    ? "border-[#F2C94C] bg-[#F2C94C]/20"
-                    : "border-white/10 bg-white/10 hover:bg-white/15"
+                  ? "border-[#F2C94C] bg-[#F2C94C]/20"
+                  : "border-white/10 bg-white/10 hover:bg-white/15"
                   }`}
               >
                 السؤال {question.order_number}: {question.question_text}
@@ -1295,17 +1397,17 @@ function AnswersSection({
       ) : (
         <div className="space-y-6">
           {participants.map((participant) => {
-         const playerAnswers = answers.filter(
-  (answer) => answer.participant_id === participant.id
-);
+            const playerAnswers = answers.filter(
+              (answer) => answer.participant_id === participant.id
+            );
 
             const correctCount = playerAnswers.filter(
-  (answer) => answer.is_correct
-).length;
+              (answer) => answer.is_correct
+            ).length;
 
-const wrongCount = playerAnswers.filter(
-  (answer) => !answer.is_correct
-).length;
+            const wrongCount = playerAnswers.filter(
+              (answer) => !answer.is_correct
+            ).length;
 
             return (
               <div
@@ -1346,11 +1448,10 @@ const wrongCount = playerAnswers.filter(
                           </p>
 
                           <span
-                            className={`rounded-full px-3 py-1 text-sm font-black ${
-                              answer.is_correct
-                                ? "bg-green-500/20 text-green-200"
-                                : "bg-red-500/20 text-red-200"
-                            }`}
+                            className={`rounded-full px-3 py-1 text-sm font-black ${answer.is_correct
+                              ? "bg-green-500/20 text-green-200"
+                              : "bg-red-500/20 text-red-200"
+                              }`}
                           >
                             {answer.is_correct ? "صحيح" : "خطأ"}
                           </span>
@@ -1412,8 +1513,8 @@ function WinnersSection({
             <div
               key={player.id}
               className={`rounded-[2rem] border p-6 text-center ${index === 0
-                  ? "border-[#F2C94C] bg-[#F2C94C]/20"
-                  : "border-white/10 bg-white/10"
+                ? "border-[#F2C94C] bg-[#F2C94C]/20"
+                : "border-white/10 bg-white/10"
                 }`}
             >
               <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#F2C94C] text-4xl font-black text-[#063F36]">
@@ -1483,8 +1584,8 @@ function AnswerBox({
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl p-4 ${correct
-          ? "border border-[#F2C94C] bg-[#F2C94C]/20"
-          : "border border-white/10 bg-white/10"
+        ? "border border-[#F2C94C] bg-[#F2C94C]/20"
+        : "border border-white/10 bg-white/10"
         }`}
     >
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white font-black text-[#063F36]">

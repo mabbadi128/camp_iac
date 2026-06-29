@@ -1,3 +1,5 @@
+import PushNotificationsButton from "@/components/PushNotificationsButton";
+
 export default function Home() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#063F36] text-white">
@@ -135,7 +137,7 @@ export default function Home() {
 
            
             </div>
-
+<PushNotificationsButton />
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/15 bg-[#032B25]/50 p-4 shadow-[0_16px_35px_rgba(0,0,0,0.28)] backdrop-blur-md">
                 <p className="text-2xl drop-shadow-lg">⛺</p>

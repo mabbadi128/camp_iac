@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import PushNotificationsButton from "@/components/PushNotificationsButton";
 
 type EventData = {
   id: string;
@@ -295,6 +296,7 @@ async function submitAnswer(answer: "A" | "B" | "C" | "D") {
   return (
     <main className="min-h-screen bg-[#063F36] p-5 text-white">
       <div className="mx-auto max-w-md">
+        <PushNotificationsButton />
         <header className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-5">
           <div className="mb-4 rounded-2xl bg-white p-4">
             <img src="/iac-logo.png" alt="Logo" className="mx-auto h-20 w-auto" />
