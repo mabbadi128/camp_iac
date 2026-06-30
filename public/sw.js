@@ -16,7 +16,7 @@ self.addEventListener("push", function (event) {
 
   const options = {
     body: data.body || "لديك إشعار جديد من إدارة المعسكر",
-    icon: "/icon-192.png",
+    icon: "/icon-512.png",
     badge: "/icon-192.png",
     data: {
       url: data.url || "/",
