@@ -16,8 +16,8 @@ self.addEventListener("push", function (event) {
 
   const options = {
     body: data.body || "لديك إشعار جديد من إدارة المعسكر",
-    icon: "/iac-logo.png",
-    badge: "/iac-logo.png",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     data: {
       url: data.url || "/",
     },
